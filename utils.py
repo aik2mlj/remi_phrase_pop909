@@ -118,9 +118,10 @@ def phrase_config_from_string(phrase_annotation):
 
 # read phrases from annotation
 def get_phrase_items(phrase_annotation_path, max_bar, prompt_phrase_config=None):
-    phrase_configuration = [('Start', 1)]
+    phrase_configuration = []
     if phrase_annotation_path:
         # training time
+        phrase_configuration.append(('Start', 1))
         with open(phrase_annotation_path) as f:
             phrase_annotation = f.readline().strip()
         phrase_configuration.extend(phrase_config_from_string(phrase_annotation))
@@ -138,16 +139,17 @@ def get_phrase_items(phrase_annotation_path, max_bar, prompt_phrase_config=None)
         phrase_configuration.append(('End', 1))
     print(phrase_configuration)
 
+    ticks_per_bar = DEFAULT_RESOLUTION * 4
     phrase_items = []
     start = 0
     for label, n_bars in phrase_configuration:
         for i in range(n_bars):
-            if prompt_phrase_config and start >= max_bar:
+            if prompt_phrase_config and start >= max_bar * ticks_per_bar:
                 # prompt inference: crop phrase config to the bar of the last prompt note
                 break
             phrase_items.append(Item(name='Phrase', start=start, end=start + ticks_per_bar, velocity=None, pitch=f'{label}_{n_bars - i}'))
             start += ticks_per_bar
-        if prompt_phrase_config and start >= max_bar:
+        if prompt_phrase_config and start >= max_bar * ticks_per_bar:
             # prompt inference: crop phrase config to the bar of the last prompt note
             break
     print(phrase_items)

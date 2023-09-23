@@ -175,7 +175,7 @@ class PopMusicTransformer(object):
             current_generated_bar = max_bar
             words[0].append(self.event2word[f'Phrase_{bar_countdown_config[current_generated_bar][0]}'])
             words[0].append(self.event2word[f'Bar Countdown_{bar_countdown_config[current_generated_bar][1]}'])
-            print(words[0])
+            print([self.word2event[x] for x in words[0]])
         else:
             words = []
             for _ in range(self.batch_size):
