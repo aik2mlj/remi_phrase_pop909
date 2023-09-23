@@ -135,11 +135,16 @@ class PopMusicTransformer(object):
     ########################################
     # extract events for prompt continuation
     ########################################
-    def extract_events(self, midi_path, melody_annotation_path, chord_annotation_path, phrase_annotation_path, only_melody=False):
+    def extract_events(self, midi_path, melody_annotation_path, chord_annotation_path, phrase_annotation_path,
+                       only_melody=False, prompt_phrase_config=None):
         note_items = utils.get_note_items(midi_path, melody_annotation_path, only_melody)
         note_items = utils.quantize_items(note_items)
+
         max_note_time = max(item.end for item in note_items)
-        phrase_items = utils.get_phrase_items(phrase_annotation_path, max_note_time)
+        ticks_per_bar = utils.DEFAULT_RESOLUTION * 4
+        max_bar = math.ceil(max_note_time / ticks_per_bar)
+
+        phrase_items = utils.get_phrase_items(phrase_annotation_path, max_bar, prompt_phrase_config)
         if 'chord' in self.checkpoint_path:
             chord_items = utils.get_chord_items(chord_annotation_path)
             items = phrase_items + chord_items + note_items
@@ -148,16 +153,29 @@ class PopMusicTransformer(object):
         max_time = phrase_items[-1].end
         groups = utils.group_items(items, max_time)
         events = utils.item2event(groups)
-        return events
+        return events, max_bar
 
     ########################################
     # generate
     ########################################
     def generate(self, phrase_configuration, temperature, topk, output_path, prompt_paths=None):
+        phrase_configuration = [('Start', 1)] + phrase_configuration + [('End', 1)]
+        n_target_bar = sum(length for _, length in phrase_configuration) - 1
+        bar_countdown_config = []
+        for phrase in phrase_configuration:
+            for i in range(phrase[1]):
+                bar_countdown_config.append((phrase[0], phrase[1] - i))
+        print(bar_countdown_config)
+
         if prompt_paths is not None:
-            events = self.extract_events(**prompt_paths, only_melody=bool("melody" in self.checkpoint_path))
+            events, max_bar = self.extract_events(**prompt_paths, only_melody=bool("melody" in self.checkpoint_path),
+                                         prompt_phrase_config=phrase_configuration)
             words = [[self.event2word['{}_{}'.format(e.name, e.value)] for e in events]]
             words[0].append(self.event2word['Bar_None'])
+            current_generated_bar = max_bar
+            words[0].append(self.event2word[f'Phrase_{bar_countdown_config[current_generated_bar][0]}'])
+            words[0].append(self.event2word[f'Bar Countdown_{bar_countdown_config[current_generated_bar][1]}'])
+            print(words[0])
         else:
             words = []
             for _ in range(self.batch_size):
@@ -171,17 +189,13 @@ class PopMusicTransformer(object):
                     ws.append(self.event2word['Phrase_Start'])
                     ws.append(self.event2word['Bar Countdown_1'])
                 words.append(ws)
+            current_generated_bar = 0
         # initialize mem
         batch_m = [np.zeros((self.mem_len, self.batch_size, self.d_model), dtype=np.float32) for _ in range(self.n_layer)]
         # generate
         original_length = len(words[0])
         back_length = original_length
-        phrase_configuration = [('Start', 1)] + phrase_configuration + [('End', 1)]
-        n_target_bar = sum(length for _, length in phrase_configuration) - 1
-        current_generated_bar = 0
-        phrase_configuration_index = 0
-        bar_countdown = phrase_configuration[phrase_configuration_index][1]
-        p_bar = tqdm(total=n_target_bar)
+        p_bar = tqdm(total=n_target_bar - current_generated_bar)
         while current_generated_bar < n_target_bar:
             # input
             temp_x = np.zeros((self.batch_size, back_length))
@@ -205,12 +219,8 @@ class PopMusicTransformer(object):
             # if bar event (only work for batch_size=1)
             if word == self.event2word['Bar_None']:
                 current_generated_bar += 1
-                bar_countdown -= 1
-                if bar_countdown == 0:
-                    phrase_configuration_index += 1
-                    bar_countdown = phrase_configuration[phrase_configuration_index][1]
-                words[0].append(self.event2word['Phrase_' + phrase_configuration[phrase_configuration_index][0]])
-                words[0].append(self.event2word['Bar Countdown_{}'.format(bar_countdown)])
+                words[0].append(self.event2word[f'Phrase_{bar_countdown_config[current_generated_bar][0]}'])
+                words[0].append(self.event2word[f'Bar Countdown_{bar_countdown_config[current_generated_bar][1]}'])
                 back_length += 2
                 p_bar.update(1)
             # re-new mem
@@ -237,7 +247,7 @@ class PopMusicTransformer(object):
         # extract events
         all_events = []
         for path in paths:
-            events = self.extract_events(**path, only_melody=only_melody)
+            events, _ = self.extract_events(**path, only_melody=only_melody)
             all_events.append(events)
         # make dictionary
         dictionary = sorted({f'{event.name}_{event.value}' for events in all_events for event in events})

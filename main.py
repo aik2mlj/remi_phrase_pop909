@@ -7,9 +7,16 @@ from finetune import load_split_file
 
 os.environ['CUDA_VISIBLE_DEVICES'] = '0'
 
+def PhraseConfig(s):
+    try:
+        t, len = s.split(',')
+        return t, int(len)
+    except:
+        raise argparse.ArgumentTypeError("Phrase configuration must be like i,4")
+
 def main():
     parser = argparse.ArgumentParser()
-    parser.add_argument("--len", help="the generation length")
+    parser.add_argument("--phrase", type=PhraseConfig, nargs="+", help="phrase configuration: separate with space, eg. i,4 A,8 B,8 o,4")
     parser.add_argument("-n", default=1, help="how many sample to generate")
     parser.add_argument("--only-melody", action="store_true")
     parser.add_argument("--prompt", help="the prompt midi path")
@@ -27,10 +34,10 @@ def main():
         # generate from scratch
         for _ in range(int(args.n)):
             model.generate(
-                n_target_bar=n_target_bar,
+                phrase_configuration=args.phrase,
                 temperature=1.2,
                 topk=5,
-                output_path=f"./result/gen({chkpt_name})-{n_target_bar}bar_{datetime.now().strftime('%m-%d_%H%M%S')}.midi",
+                output_path=f"./result/gen({chkpt_name})-({args.phrase})_{datetime.now().strftime('%m-%d_%H%M%S')}.midi",
                 prompt_paths=None)
     else:
         # generate continuation
@@ -38,13 +45,14 @@ def main():
             'midi_path': args.prompt,
             'melody_annotation_path': None,
             'chord_annotation_path': args.prompt_chord,
+            'phrase_annotation_path': None,
         }
         for _ in range(int(args.n)):
             model.generate(
-                n_target_bar=n_target_bar,
+                phrase_configuration=args.phrase,
                 temperature=1.2,
                 topk=5,
-                output_path=f"./result/prompt_gen({chkpt_name})-{n_target_bar}bar_{datetime.now().strftime('%m-%d_%H%M%S')}.midi",
+                output_path=f"./result/prompt_gen({chkpt_name})-({args.phrase})_{datetime.now().strftime('%m-%d_%H%M%S')}.midi",
                 prompt_paths=prompt_paths)
     
     # close model

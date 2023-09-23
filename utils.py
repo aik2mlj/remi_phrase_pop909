@@ -103,33 +103,48 @@ def get_chord_items(chord_annotation_path):
     return chord_items
 
 # read phrases from annotation
-def get_phrase_items(phrase_annotation_path, max_note_time):
-    with open(phrase_annotation_path) as f:
-        phrase_annotation = f.readline().strip()
+def get_phrase_items(phrase_annotation_path, max_bar, prompt_phrase_config=None):
     phrase_configuration = [('Start', 1)]
-    index = 0
-    while index < len(phrase_annotation):
-        label = phrase_annotation[index]
-        index += 1
-        n_bars = ''
-        while index < len(phrase_annotation) and phrase_annotation[index].isdigit():
-            n_bars += phrase_annotation[index]
+    if phrase_annotation_path:
+        # training time
+        with open(phrase_annotation_path) as f:
+            phrase_annotation = f.readline().strip()
+        index = 0
+        while index < len(phrase_annotation):
+            label = phrase_annotation[index]
             index += 1
-        phrase_configuration.append((label, int(n_bars)))
+            n_bars = ''
+            while index < len(phrase_annotation) and phrase_annotation[index].isdigit():
+                n_bars += phrase_annotation[index]
+                index += 1
+            phrase_configuration.append((label, int(n_bars)))
+    else:
+        # prompt inference
+        phrase_configuration.extend(prompt_phrase_config)
+    n_bars_lack = max_bar - sum(length for _, length in phrase_configuration)
     # If the number of bars in the annotation is less than that in midi, the last phrase is lengthened
-    ticks_per_bar = DEFAULT_RESOLUTION * 4
-    n_bars_lack = math.ceil(max_note_time / ticks_per_bar) - sum(length for _, length in phrase_configuration)
     if n_bars_lack > 0:
         label, n_bars = phrase_configuration[-1]
         phrase_configuration[-1] = (label, n_bars + n_bars_lack)
-    phrase_configuration.append(('End', 1))
+
+    if phrase_annotation_path:
+        # prompt inference need no END
+        phrase_configuration.append(('End', 1))
+    print(phrase_configuration)
 
     phrase_items = []
     start = 0
     for label, n_bars in phrase_configuration:
         for i in range(n_bars):
+            if prompt_phrase_config and start >= max_bar:
+                # prompt inference: crop phrase config to the bar of the last prompt note
+                break
             phrase_items.append(Item(name='Phrase', start=start, end=start + ticks_per_bar, velocity=None, pitch=f'{label}_{n_bars - i}'))
             start += ticks_per_bar
+        if prompt_phrase_config and start >= max_bar:
+            # prompt inference: crop phrase config to the bar of the last prompt note
+            break
+    print(phrase_items)
     return phrase_items
 
 # group items
