@@ -102,6 +102,20 @@ def get_chord_items(chord_annotation_path):
             chord_items.append(Item(name='Chord', start=start, end=end, velocity=None, pitch=chord))
     return chord_items
 
+def phrase_config_from_string(phrase_annotation):
+    index = 0
+    phrase_configuration = []
+    while index < len(phrase_annotation):
+        label = phrase_annotation[index]
+        index += 1
+        n_bars = ''
+        while index < len(phrase_annotation) and phrase_annotation[index].isdigit():
+            n_bars += phrase_annotation[index]
+            index += 1
+        phrase_configuration.append((label, int(n_bars)))
+    return phrase_configuration
+
+
 # read phrases from annotation
 def get_phrase_items(phrase_annotation_path, max_bar, prompt_phrase_config=None):
     phrase_configuration = [('Start', 1)]
@@ -109,15 +123,7 @@ def get_phrase_items(phrase_annotation_path, max_bar, prompt_phrase_config=None)
         # training time
         with open(phrase_annotation_path) as f:
             phrase_annotation = f.readline().strip()
-        index = 0
-        while index < len(phrase_annotation):
-            label = phrase_annotation[index]
-            index += 1
-            n_bars = ''
-            while index < len(phrase_annotation) and phrase_annotation[index].isdigit():
-                n_bars += phrase_annotation[index]
-                index += 1
-            phrase_configuration.append((label, int(n_bars)))
+        phrase_configuration.extend(phrase_config_from_string(phrase_annotation))
     else:
         # prompt inference
         phrase_configuration.extend(prompt_phrase_config)

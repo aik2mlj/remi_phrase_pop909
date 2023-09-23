@@ -3,20 +3,14 @@ from datetime import datetime
 import os
 import argparse
 import pickle
+import utils
 from finetune import load_split_file
 
 os.environ['CUDA_VISIBLE_DEVICES'] = '0'
 
-def PhraseConfig(s):
-    try:
-        t, len = s.split(',')
-        return t, int(len)
-    except:
-        raise argparse.ArgumentTypeError("Phrase configuration must be like i,4")
-
 def main():
     parser = argparse.ArgumentParser()
-    parser.add_argument("--phrase", type=PhraseConfig, nargs="+", help="phrase configuration: separate with space, eg. i,4 A,8 B,8 o,4")
+    parser.add_argument("--phrase", help="phrase configuration, eg. i4A8B8o4")
     parser.add_argument("-n", default=1, help="how many sample to generate")
     parser.add_argument("--only-melody", action="store_true")
     parser.add_argument("--prompt", help="the prompt midi path")
@@ -24,6 +18,7 @@ def main():
     args = parser.parse_args()
 
     chkpt_name = 'REMI-PhBC-chord-melody' if args.only_melody else "REMI-PhBC-chord"
+    phrase_configuration = utils.phrase_config_from_string(args.phrase)
 
     # declare model
     model = PopMusicTransformer(
@@ -34,7 +29,7 @@ def main():
         # generate from scratch
         for _ in range(int(args.n)):
             model.generate(
-                phrase_configuration=args.phrase,
+                phrase_configuration=phrase_configuration,
                 temperature=1.2,
                 topk=5,
                 output_path=f"./result/gen({chkpt_name})-({args.phrase})_{datetime.now().strftime('%m-%d_%H%M%S')}.midi",
@@ -49,7 +44,7 @@ def main():
         }
         for _ in range(int(args.n)):
             model.generate(
-                phrase_configuration=args.phrase,
+                phrase_configuration=phrase_configuration,
                 temperature=1.2,
                 topk=5,
                 output_path=f"./result/prompt_gen({chkpt_name})-({args.phrase})_{datetime.now().strftime('%m-%d_%H%M%S')}.midi",
