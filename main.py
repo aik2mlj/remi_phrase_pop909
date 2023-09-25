@@ -32,7 +32,7 @@ def main():
                 phrase_configuration=phrase_configuration,
                 temperature=1.2,
                 topk=5,
-                output_path=f"./result/gen({chkpt_name})-({args.phrase})_{datetime.now().strftime('%m-%d_%H%M%S')}.midi",
+                output_path=f"./result/gen({chkpt_name})-({args.phrase})_{datetime.now().strftime('%m-%d_%H%M%S')}.mid",
                 prompt_paths=None)
     else:
         # generate continuation
@@ -48,7 +48,7 @@ def main():
                 phrase_configuration=phrase_configuration,
                 temperature=1.2,
                 topk=5,
-                output_path=f"./result/prompt_gen({chkpt_name})-({prompt_id})-({args.phrase})_{datetime.now().strftime('%m-%d_%H%M%S')}.midi",
+                output_path=f"./result/prompt_gen({chkpt_name})-({prompt_id})-({args.phrase})_{datetime.now().strftime('%m-%d_%H%M%S')}.mid",
                 prompt_paths=prompt_paths)
     
     # close model
