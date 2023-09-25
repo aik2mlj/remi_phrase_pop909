@@ -42,12 +42,13 @@ def main():
             'chord_annotation_path': args.prompt_chord,
             'phrase_annotation_path': None,
         }
+        prompt_id = args.prompt.split("/")[-1].split(".")[0].split("_")[-1]
         for _ in range(int(args.n)):
             model.generate(
                 phrase_configuration=phrase_configuration,
                 temperature=1.2,
                 topk=5,
-                output_path=f"./result/prompt_gen({chkpt_name})-({args.phrase})_{datetime.now().strftime('%m-%d_%H%M%S')}.midi",
+                output_path=f"./result/prompt_gen({chkpt_name})-({prompt_id})-({args.phrase})_{datetime.now().strftime('%m-%d_%H%M%S')}.midi",
                 prompt_paths=prompt_paths)
     
     # close model
